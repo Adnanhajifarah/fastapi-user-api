@@ -64,7 +64,7 @@ def login(user: User):
     if result is None:
         return {"error: User Not Found"}
     stored_passwords = result[0]
-    if verify_password(user.password):
+    if verify_password(user.password,stored_passwords):
         return {"message : Login Successful"}
     else:
         return {"Error : Invalid Password"}
