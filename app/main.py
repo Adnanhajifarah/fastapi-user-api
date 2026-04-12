@@ -1,12 +1,14 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from app.database import get_connection
+from app.auth import hash_password, verify_password
 
 app = FastAPI()
 
 class User(BaseModel):
     name: str
     email: str
+    password: str
 
 @app.get("/")
 def root():
@@ -40,11 +42,29 @@ def get_users():
 def create_user(user: User):
     conn = get_connection()
     cursor = conn.cursor() 
+    hashword = hash_password(user.password)
     cursor.execute(
-        "INSERT INTO users (name, email) VALUES (%s, %s)", 
-        (user.name, user.email)
+        "INSERT INTO users (name, email, password) VALUES (%s, %s, %s)", 
+        (user.name, user.email, hashword)
     )
     conn.commit()
     cursor.close()
     conn.close()
     return {"message": "User created"}
+
+@app.post("/login")
+def login(user: User):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT password FROM users WHERE email = %s",(user.email,) 
+    )
+    result = cursor.fetchone()
+
+    if result is None:
+        return {"error: User Not Found"}
+    stored_passwords = result[0]
+    if verify_password(user.password):
+        return {"message : Login Successful"}
+    else:
+        return {"Error : Invalid Password"}
