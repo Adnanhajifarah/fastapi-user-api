@@ -4,12 +4,7 @@ import psycopg2
 
 
 def get_connection():
-    """Open a PostgreSQL connection.
-
-    Credentials are read from environment variables, with local-development
-    defaults as a fallback so the app still runs locally with no extra setup.
-    In production/deployment, set these env vars instead of hardcoding secrets.
-    """
+    """Open a PostgreSQL connection."""
     return psycopg2.connect(
         dbname=os.environ.get("DB_NAME", "fast_apidb"),
         user=os.environ.get("DB_USER", "adn"),
