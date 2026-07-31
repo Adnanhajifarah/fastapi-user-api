@@ -1,8 +1,9 @@
 import psycopg2
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import get_connection
 from app.auth import hash_password, verify_password
+from app.security import create_access_token, get_current_user
 from app.models import User
 
 router = APIRouter()
@@ -66,7 +67,29 @@ def login(user: User):
         raise HTTPException(status_code=404, detail="User not found")
 
     stored_password = result[0]
-    if verify_password(user.password, stored_password):
-        return {"message": "Login successful"}
+    if not verify_password(user.password, stored_password):
+        raise HTTPException(status_code=401, detail="Invalid password")
 
-    raise HTTPException(status_code=401, detail="Invalid password")
+    access_token = create_access_token(subject=user.email)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.get("/me")
+def read_me(current_user: str = Depends(get_current_user)):
+    """Protected: only reachable with a valid bearer token.
+
+    `current_user` is the email pulled from the verified token, so the route
+    returns the record belonging to whoever owns the token.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, name, email FROM users WHERE email = %s", (current_user,)
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"id": row[0], "name": row[1], "email": row[2]}
