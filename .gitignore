@@ -3,3 +3,12 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+
+# Dead x86_64 virtualenv left over from the Apple Silicon migration
+venv.old-x86/
+
+# pytest scratch
+.pytest_cache/
+
+# Job-search material - belongs in ~/Documents/job-search, not in the portfolio repo
+job-apply-setup.md

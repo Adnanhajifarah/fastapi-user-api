@@ -39,7 +39,7 @@ def create_user(user: User):
     hashed = hash_password(user.password)
     try:
         cursor.execute(
-            "INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
+            "INSERT INTO users (name, email, password_hash) VALUES (%s, %s, %s)",
             (user.name, user.email, hashed),
         )
         conn.commit()
@@ -57,7 +57,7 @@ def login(user: User):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT password FROM users WHERE email = %s", (user.email,)
+        "SELECT password_hash FROM users WHERE email = %s", (user.email,)
     )
     result = cursor.fetchone()
     cursor.close()
