@@ -13,6 +13,7 @@ storage; login issues a signed JWT, and protected routes require a valid token.
   response and equalized response time whether the account exists or not
 - Versioned schema with Alembic migrations, including pgvector for the
   recommender work in progress
+- TMDB catalog ingestion as a re-runnable CLI script (`python -m app.ingest`)
 - Pooled database connections, released on every path including errors
 - Input validation with Pydantic (email format + password length)
 - Parameterized SQL via psycopg2 to prevent injection
@@ -84,6 +85,25 @@ alembic history    # the full chain of revisions
 alembic downgrade -1   # undo the most recent revision
 ```
 
+## Loading the film catalog
+
+Ingestion is a command-line script, not an endpoint - it makes hundreds of
+outbound requests and takes minutes. Get a free TMDB key at
+<https://www.themoviedb.org/settings/api>, then:
+
+```bash
+export TMDB_API_KEY=your-key-here
+python -m app.ingest --pages 100        # ~2,000 films, 20 per page
+python -m app.ingest --pages 2 --dry-run  # fetch and parse, write nothing
+```
+
+Re-running is safe. Films are matched on their TMDB id, so a second run updates
+existing rows rather than duplicating them. If a film's title or overview has
+changed, its stored embedding is cleared so the backfill recomputes it; films
+whose text is unchanged keep theirs.
+
+See `.env.example` for every environment variable the project reads.
+
 ## How to run
 ```bash
 python3 -m venv venv
@@ -106,7 +126,7 @@ pytest
 ```
 
 ## Roadmap
-- TMDB catalog ingestion and embedding backfill
+- Embedding backfill for ingested films
 - `POST /recommend`: vector retrieval plus LLM ranking, with a keyword-search baseline
 - Integration tests for the API endpoints (against a test database)
 - Dockerfile + docker-compose
