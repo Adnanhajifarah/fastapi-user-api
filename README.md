@@ -14,6 +14,10 @@ storage; login issues a signed JWT, and protected routes require a valid token.
 - Versioned schema with Alembic migrations, including pgvector for the
   recommender work in progress
 - TMDB catalog ingestion as a re-runnable CLI script (`python -m app.ingest`)
+- Local sentence-transformer embeddings stored in pgvector, backfilled
+  incrementally (`python -m app.backfill`)
+- Semantic search over the catalog, with a Postgres full-text search
+  baseline alongside it so retrieval quality can actually be measured
 - Pooled database connections, released on every path including errors
 - Input validation with Pydantic (email format + password length)
 - Parameterized SQL via psycopg2 to prevent injection
@@ -23,6 +27,7 @@ storage; login issues a signed JWT, and protected routes require a valid token.
 - Python, FastAPI
 - PostgreSQL (psycopg2, with a threaded connection pool)
 - Alembic for schema migrations; pgvector for embeddings
+- sentence-transformers (all-MiniLM-L6-v2, 384-dim, runs locally and free)
 - Passlib + bcrypt for password hashing
 - PyJWT for token-based authentication
 - Pydantic for request validation
@@ -104,6 +109,39 @@ whose text is unchanged keep theirs.
 
 See `.env.example` for every environment variable the project reads.
 
+### Working without a TMDB key
+
+A 30-film seed catalog is checked in so search can be developed and tested
+without an API key, and so the recommendation eval has a fixed set of films that
+does not shift the way TMDB's popular list does:
+
+```bash
+python -m app.seed       # load seeds/movies.json
+python -m app.backfill   # compute embeddings for anything missing one
+```
+
+## Embeddings and search
+
+`python -m app.backfill` embeds every film that has no embedding yet, in batches.
+It is separate from ingestion because the two are bound by different things -
+ingestion waits on TMDB's network, embedding waits on local compute - and
+because when the ingest clears a stale embedding, this picks up only that film.
+
+Two searches live in `app/search.py`:
+
+| Function | How it works |
+|---|---|
+| `vector_search` | Embeds the query, sorts by pgvector cosine distance |
+| `keyword_search` | Postgres full-text search, no embeddings at all |
+
+The keyword search is a deliberate **baseline**. Without something to compare
+against, "the results look plausible" is the only available claim about
+retrieval quality, and that is not a measurement. Measured on the seed catalog,
+plot-style queries strongly favour the vector search ("aliens land and a
+linguist learns to communicate" returns Arrival at roughly twice the runner-up's
+score), while short keyword-like queries are often served just as well or better
+by full-text search.
+
 ## How to run
 ```bash
 python3 -m venv venv
@@ -126,7 +164,7 @@ pytest
 ```
 
 ## Roadmap
-- Embedding backfill for ingested films
+- Recommendation eval harness measuring vector search against the keyword baseline
 - `POST /recommend`: vector retrieval plus LLM ranking, with a keyword-search baseline
 - Integration tests for the API endpoints (against a test database)
 - Dockerfile + docker-compose
